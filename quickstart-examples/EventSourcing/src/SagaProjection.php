@@ -9,20 +9,25 @@ use Ecotone\EventSourcing\Attribute\Projection;
 use Ecotone\EventSourcing\Attribute\ProjectionInitialization;
 use Ecotone\Messaging\Support\Assert;
 use Ecotone\Modelling\Attribute\EventHandler;
+use Ecotone\Modelling\Attribute\QueryHandler;
 
 #[Projection("saga_projection", Saga::class)]
 class SagaProjection
 {
-    private array $priceChangeOverTime = [];
-
     private bool $isInitialized = false;
-    private bool $sagaStarted = false;
+    private array $sagaStarted = [];
+
+    #[QueryHandler("saga.hasStarted")]
+    public function hasSagaStarted(): array
+    {
+        return $this->sagaStarted;
+    }
 
     #[EventHandler]
     public function when(SagaStarted $event): void
     {
         Assert::isTrue($this->isInitialized, "Saga Projection is not initialized");
-        $this->sagaStarted = true;
+        $this->sagaStarted[$event->getProductId()] = true;
     }
 
     #[ProjectionInitialization]

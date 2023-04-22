@@ -23,7 +23,15 @@ class Saga
     #[EventHandler()]
     public static function start(ProductWasRegistered $event, CommandBus $commandBus): array
     {
-        $commandBus->send(new ChangePrice($event->getProductId(), 100));
+        // This one is Ok
+        if ($event->getProductId() === 2) {
+            $commandBus->send(new ChangePrice(1, 100));
+        }
+
+        // This one is failing
+        if ($event->getProductId() === 3) {
+            $commandBus->send(new ChangePrice(3, 100));
+        }
 
         return [new SagaStarted($event->getProductId())];
     }

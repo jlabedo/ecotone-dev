@@ -13,7 +13,9 @@ $messagingSystem = EcotoneLiteApplication::boostrap(pathToRootCatalog: __DIR__);
 $messagingSystem->runConsoleCommand("ecotone:es:initialize-projection", ["name" => "price_change_over_time"]);
 
 $productId = 1;
+$poductId2 = 2;
 $messagingSystem->getCommandBus()->send(new RegisterProduct($productId, 100));
+$messagingSystem->getCommandBus()->send(new RegisterProduct($poductId2, 100));
 
 Assert::assertEquals([new PriceChange(100, 0), new PriceChange(100, 0)], $messagingSystem->getQueryBus()->sendWithRouting("product.getPriceChange", $productId), "Price change should equal to 0 after registration");
 echo "Product was registered\n";
@@ -22,3 +24,6 @@ $messagingSystem->getCommandBus()->send(new ChangePrice($productId, 120));
 
 Assert::assertEquals([new PriceChange(100, 0), new PriceChange(100, 0), new PriceChange(120, 20)], $messagingSystem->getQueryBus()->sendWithRouting("product.getPriceChange", $productId), "Price change should equal to 0 after registration");
 echo "Price of the product was changed\n";
+
+Assert::assertEquals([1 => true, 2 => true], $messagingSystem->getQueryBus()->sendWithRouting("saga.hasStarted"), "All products saga should be started");
+echo "All sagas were started\n";
