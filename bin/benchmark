@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+previousBranch=$(git rev-parse --abbrev-ref HEAD)
+dir=$(git rev-parse --show-toplevel)
+exampleApp=$dir/Monorepo/ExampleApp
+
+function cleanup {
+  git checkout $previousBranch
+}
+trap cleanup EXIT
+
+git checkout main
+git clean -fdx $exampleApp
+$dir/vendor/bin/phpbench run --tag=main "$@"
+
+git checkout $previousBranch
+git clean -fdx $exampleApp
+$dir/vendor/bin/phpbench run --ref=main "$@"
