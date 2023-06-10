@@ -8,6 +8,10 @@ class PreparedConfigurationFromDumpFactory
 {
     public static function get(string $filename): PreparedConfiguration
     {
-        return require $filename;
+        if (\opcache_get_configuration() !== false) {
+            return require $filename;
+        } else {
+            return unserialize(file_get_contents($filename.'-serialized'));
+        }
     }
 }

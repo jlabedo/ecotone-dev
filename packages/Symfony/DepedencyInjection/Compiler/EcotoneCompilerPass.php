@@ -72,7 +72,7 @@ class EcotoneCompilerPass implements CompilerPassInterface
         $ecotoneCacheDirectory    = $container->getParameter('kernel.cache_dir') . self::CACHE_DIRECTORY_SUFFIX;
         $serviceConfiguration = ServiceConfiguration::createWithDefaults()
             ->withEnvironment($container->getParameter('kernel.environment'))
-            ->withFailFast($container->getParameter('kernel.environment') === 'prod' ? false : $container->getParameter(self::FAIL_FAST_CONFIG))
+            ->withFailFast(true)
             ->withLoadCatalog($container->getParameter(self::LOAD_SRC) ? 'src' : '')
             ->withNamespaces($container->getParameter(self::WORKING_NAMESPACES_CONFIG))
             ->withSkippedModulePackageNames($container->getParameter(self::SKIPPED_MODULE_PACKAGES))
@@ -126,6 +126,8 @@ class EcotoneCompilerPass implements CompilerPassInterface
         $code = VarExporter::export($preparedConfiguration);
         file_put_contents($filename, '<?php
 return ' . $code . ';');
+
+        \file_put_contents($filename.'-serialized', \serialize($preparedConfiguration));
     }
 
     public function process(ContainerBuilder $container)
