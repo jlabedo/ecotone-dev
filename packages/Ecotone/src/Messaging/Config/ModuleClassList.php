@@ -57,6 +57,7 @@ use Ecotone\Modelling\MessageHandling\Distribution\Module\DistributedHandlerModu
 use Ecotone\Modelling\MessageHandling\MetadataPropagator\MessageHeadersPropagatorInterceptor;
 use Ecotone\Modelling\QueryBus;
 use Ecotone\OpenTelemetry\Configuration\OpenTelemetryModule;
+use Ecotone\Projecting\Config\ProjectingModule;
 use Ecotone\Redis\Configuration\RedisMessageConsumerModule;
 use Ecotone\Redis\Configuration\RedisMessagePublisherModule;
 use Ecotone\Sqs\Configuration\SqsMessageConsumerModule;
@@ -96,6 +97,7 @@ class ModuleClassList
         InstantRetryModule::class,
         DynamicMessageChannelModule::class,
         EventSourcedRepositoryModule::class,
+        ProjectingModule::class,
 
         /** Attribute based configurations */
         MessageHeadersPropagatorInterceptor::class,
