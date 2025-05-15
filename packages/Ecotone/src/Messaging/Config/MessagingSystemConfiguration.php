@@ -226,7 +226,7 @@ final class MessagingSystemConfiguration implements Configuration
 
         $extensionObjects = $serviceExtensions;
         foreach ($modules as $module) {
-            $extensionObjects = array_merge($extensionObjects, $module->getModuleExtensions($serviceConfiguration, $serviceExtensions));
+            $extensionObjects = array_merge($extensionObjects, $module->getModuleExtensions($serviceConfiguration, $serviceExtensions, $this->interfaceToCallRegistry));
         }
         foreach ($modules as $module) {
             $moduleExtensions[get_class($module)] = [];
