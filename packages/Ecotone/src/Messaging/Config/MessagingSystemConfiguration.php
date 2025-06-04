@@ -1040,8 +1040,8 @@ final class MessagingSystemConfiguration implements Configuration
             $priority = PriorityBasedOnType::default();
             if ($messageHandlerBuilder instanceof MessageHandlerBuilderWithOutputChannel) {
                 $interfaceToCall = $messageHandlerBuilder->getInterceptedInterface($this->interfaceToCallRegistry);
-                if ($interfaceToCall->hasAnnotation(TypeDescriptor::create(PriorityBasedOnType::class))) {
-                    $priority = $interfaceToCall->getAnnotationsByImportanceOrder(TypeDescriptor::create(PriorityBasedOnType::class))[0];
+                if ($interfaceToCall->hasAnnotation(PriorityBasedOnType::class)) {
+                    $priority = $interfaceToCall->getAnnotationsByImportanceOrder(PriorityBasedOnType::class)[0];
                 }
             }
             if ($messageHandlerBuilder instanceof InterceptedEndpoint) {

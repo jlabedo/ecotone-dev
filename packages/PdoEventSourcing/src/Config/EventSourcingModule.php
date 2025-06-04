@@ -49,7 +49,11 @@ use Ecotone\Messaging\Config\Container\Reference;
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ModuleReferenceSearchService;
 use Ecotone\Messaging\Config\ServiceConfiguration;
+use Ecotone\Messaging\Conversion\ConversionService;
 use Ecotone\Messaging\Endpoint\InboundChannelAdapter\InboundChannelAdapterBuilder;
+use Ecotone\Messaging\Gateway\MessagingEntrypoint;
+use Ecotone\Messaging\Gateway\MessagingEntrypointWithHeadersPropagation;
+use Ecotone\Messaging\Handler\ChannelResolver;
 use Ecotone\Messaging\Handler\ClassDefinition;
 use Ecotone\Messaging\Handler\Filter\MessageFilterBuilder;
 use Ecotone\Messaging\Handler\Gateway\GatewayProxyBuilder;
@@ -58,18 +62,25 @@ use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaders
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayHeaderValueBuilder;
 use Ecotone\Messaging\Handler\Gateway\ParameterToMessageConverter\GatewayPayloadBuilder;
 use Ecotone\Messaging\Handler\InterfaceToCallRegistry;
+use Ecotone\Messaging\Handler\Logger\LoggingGateway;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\Converter\HeaderBuilder;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\Converter\PayloadBuilder;
 use Ecotone\Messaging\Handler\ReferenceSearchService;
+use Ecotone\Messaging\Handler\Router\RouterProcessor;
 use Ecotone\Messaging\Handler\Router\RouterProcessorBuilder;
+use Ecotone\Messaging\Handler\Router\RouteToChannelResolver;
 use Ecotone\Messaging\Handler\ServiceActivator\MessageProcessorActivatorBuilder;
 use Ecotone\Messaging\Handler\ServiceActivator\ServiceActivatorBuilder;
 use Ecotone\Messaging\Handler\Splitter\SplitterBuilder;
 use Ecotone\Messaging\Handler\TypeDescriptor;
 use Ecotone\Messaging\Support\Assert;
 use Ecotone\Modelling\Attribute\EventHandler;
+use Ecotone\Modelling\Attribute\NamedEvent;
 use Ecotone\Modelling\Config\MessageBusChannel;
 use Ecotone\Modelling\Config\MessageHandlerRoutingModule;
+use Ecotone\Modelling\Config\Routing\BusRouteSelector;
+use Ecotone\Modelling\Config\Routing\BusRoutingKeyResolver;
+use Ecotone\Modelling\Config\Routing\BusRoutingMapBuilder;
 use Ramsey\Uuid\Uuid;
 
 #[ModuleAnnotation]
@@ -83,27 +94,16 @@ class EventSourcingModule extends NoExternalConfigurationModule
     public const ECOTONE_ES_DELETE_PROJECTION = 'ecotone:es:delete-projection';
     public const ECOTONE_ES_INITIALIZE_PROJECTION = 'ecotone:es:initialize-projection';
     public const ECOTONE_ES_TRIGGER_PROJECTION = 'ecotone:es:trigger-projection';
-    /**
-     * @var ProjectionSetupConfiguration[]
-     */
-    private array $projectionSetupConfigurations;
-    /** @var ServiceActivatorBuilder[] */
-    private array $projectionLifeCycleServiceActivators = [];
-    private AggregateStreamMapping $aggregateToStreamMapping;
-    private AggregateTypeMapping $aggregateTypeMapping;
 
     /**
-     * @var ProjectionSetupConfiguration[]
-     * @var AnnotatedDefinition[] $projectionEventHandlers
-     * @var ServiceActivatorBuilder[]
-     * @var GatewayProxyBuilder[]
+     * @param ProjectionSetupConfiguration[] $projectionSetupConfigurations
+     * @param AnnotatedDefinition[] $projectionEventHandlers
+     * @param array<string, string> $namedEvents key is class name, value is event name
+     * @param ServiceActivatorBuilder[] $projectionLifeCycleServiceActivators
+     * @param GatewayProxyBuilder[] $projectionStateGateways
      */
-    private function __construct(array $projectionConfigurations, private array $projectionEventHandlers, private AsynchronousModule $asynchronousModule, array $projectionLifeCycleServiceActivators, AggregateStreamMapping $aggregateToStreamMapping, AggregateTypeMapping $aggregateTypeMapping, private array $projectionStateGateways)
+    private function __construct(private array $projectionSetupConfigurations, private array $projectionEventHandlers, private array $namedEvents, private array $projectionLifeCycleServiceActivators, private AggregateStreamMapping $aggregateToStreamMapping, private AggregateTypeMapping $aggregateTypeMapping, private array $projectionStateGateways)
     {
-        $this->projectionSetupConfigurations = $projectionConfigurations;
-        $this->projectionLifeCycleServiceActivators = $projectionLifeCycleServiceActivators;
-        $this->aggregateToStreamMapping = $aggregateToStreamMapping;
-        $this->aggregateTypeMapping = $aggregateTypeMapping;
     }
 
     public static function create(AnnotationFinder $annotationRegistrationService, InterfaceToCallRegistry $interfaceToCallRegistry): static
@@ -246,8 +246,13 @@ class EventSourcingModule extends NoExternalConfigurationModule
 
             $projectionSetupConfigurations[$projectionAttribute->getName()] = $projectionConfiguration;
         }
+        $namedEvents = [];
+        foreach ($annotationRegistrationService->findAnnotatedClasses(NamedEvent::class) as $className) {
+            $attribute = $annotationRegistrationService->getAttributeForClass($className, NamedEvent::class);
+            $namedEvents[$className] = $attribute->getName();
+        }
 
-        return new self($projectionSetupConfigurations, $projectionEventHandlers, AsynchronousModule::create($annotationRegistrationService, $interfaceToCallRegistry), $projectionLifeCyclesServiceActivators, AggregateStreamMapping::createWith($aggregateToStreamMapping), AggregateTypeMapping::createWith($aggregateTypeMapping), $projectionStateGateways);
+        return new self($projectionSetupConfigurations, $projectionEventHandlers, $namedEvents, $projectionLifeCyclesServiceActivators, AggregateStreamMapping::createWith($aggregateToStreamMapping), AggregateTypeMapping::createWith($aggregateTypeMapping), $projectionStateGateways);
     }
 
     public function prepare(Configuration $messagingConfiguration, array $extensionObjects, ModuleReferenceSearchService $moduleReferenceSearchService, InterfaceToCallRegistry $interfaceToCallRegistry): void
@@ -268,7 +273,8 @@ class EventSourcingModule extends NoExternalConfigurationModule
             new Definition(LazyProophProjectionManager::class, [
                 Reference::to(EventSourcingConfiguration::class),
                 $this->projectionSetupConfigurations,
-                Reference::to(ReferenceSearchService::class),
+                Reference::to(MessagingEntrypointWithHeadersPropagation::class),
+                Reference::to(ConversionService::class),
                 Reference::to(LazyProophEventStore::class),
             ]),
         );
@@ -559,28 +565,12 @@ class EventSourcingModule extends NoExternalConfigurationModule
                 $projectionRunningConfigurations[$extensionObject->getProjectionName()] = $extensionObject;
             }
         }
+        /** @var array<string, AnnotatedDefinition[]> $eventHandlersByProjectionName */
+        $eventHandlersByProjectionName = [];
         foreach ($this->projectionEventHandlers as $projectionEventHandler) {
             /** @var Projection $projectionAttribute */
             $projectionAttribute = $projectionEventHandler->getAnnotationForClass();
-            /** @var EndpointAnnotation $handlerAttribute */
-            $handlerAttribute = $projectionEventHandler->getAnnotationForMethod();
-            $projectionConfiguration = $this->projectionSetupConfigurations[$projectionAttribute->getName()];
-
-            /** @TODO in case of Projection Event Handlers we don't need to register them asynchronously, so this can be simplified to assume always synchronous */
-            $eventHandlerTriggeringInputChannel = MessageHandlerRoutingModule::getExecutionMessageHandlerChannel($projectionEventHandler);
-            $eventHandlerSynchronousInputChannel = $serviceConfiguration->isModulePackageEnabled(ModulePackageList::ASYNCHRONOUS_PACKAGE) ? $this->asynchronousModule->getSynchronousChannelFor($eventHandlerTriggeringInputChannel, $handlerAttribute->getEndpointId()) : $eventHandlerTriggeringInputChannel;
-
-            $this->projectionSetupConfigurations[$projectionAttribute->getName()] = $projectionConfiguration->withProjectionEventHandler(
-                MessageHandlerRoutingModule::getRoutingInputMessageChannelForEventHandler($projectionEventHandler, $interfaceToCallRegistry),
-                $projectionEventHandler->getClassName(),
-                $projectionEventHandler->getMethodName(),
-                $eventHandlerSynchronousInputChannel
-            );
-            if (array_key_exists($projectionAttribute->getName(), $projectionRunningConfigurations)) {
-                $projectionRunningConfiguration = $projectionRunningConfigurations[$projectionAttribute->getName()];
-                $this->projectionSetupConfigurations[$projectionAttribute->getName()] = $this->projectionSetupConfigurations[$projectionAttribute->getName()]
-                    ->withPolling($projectionRunningConfiguration->isPolling());
-            }
+            $eventHandlersByProjectionName[$projectionAttribute->getName()][] = $projectionEventHandler;
         }
 
         $messagingConfiguration->registerServiceDefinition(ProophEventMapper::class, Definition::createFor(ProophEventMapper::class, [Reference::to(EventMapper::class)]));
@@ -595,6 +585,7 @@ class EventSourcingModule extends NoExternalConfigurationModule
             }
 
             $projectionSetupConfiguration = $projectionSetupConfiguration
+                ->withPolling($projectionRunningConfiguration->isPolling())
                 ->withOptions(
                     array_merge(
                         $projectionSetupConfiguration->getProjectionOptions(),
@@ -607,6 +598,28 @@ class EventSourcingModule extends NoExternalConfigurationModule
                 (new ProjectionExecutorBuilder($projectionSetupConfiguration, 'execute'))
                     ->withEndpointId($projectionSetupConfiguration->getProjectionEndpointId())
                     ->withInputChannelName($projectionSetupConfiguration->getProjectionInputChannel())
+            );
+
+            /**  Router for executing events */
+            $eventHandlers = $eventHandlersByProjectionName[$projectionSetupConfiguration->getProjectionName()];
+            $routerMap = new BusRoutingMapBuilder();
+            foreach ($eventHandlers as $eventHandler) {
+                $routerMap->addRoutesFromAnnotatedFinding($eventHandler, $interfaceToCallRegistry);
+            }
+            foreach ($this->namedEvents as $className => $eventName) {
+                $routerMap->addObjectAlias($className, $eventName);
+            }
+            $messagingConfiguration->registerMessageHandler(
+                MessageProcessorActivatorBuilder::create()
+                    ->withInputChannelName($projectionSetupConfiguration->getActionRouterChannel())
+                    ->chain(new Definition(RouterProcessor::class, [
+                        new Definition(BusRouteSelector::class, [
+                            $routerMap->compile(),
+                            new Definition(BusRoutingKeyResolver::class, [ProjectionEventHandler::PROJECTION_EVENT_NAME]),
+                        ]),
+                        new Definition(RouteToChannelResolver::class, [new Reference(ChannelResolver::class)]),
+                        false,
+                    ]))
             );
 
             if ($projectionRunningConfiguration->isPolling()) {

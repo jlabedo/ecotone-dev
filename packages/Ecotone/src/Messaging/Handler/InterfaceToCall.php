@@ -99,16 +99,17 @@ class InterfaceToCall
     }
 
     /**
-     * @param Type $className
+     * @param class-string|Type $className
      *
      * @return bool
      * @throws TypeDefinitionException
      * @throws MessagingException
      */
-    public function hasMethodAnnotation(Type $className): bool
+    public function hasMethodAnnotation(string|Type $className): bool
     {
+        $className = (string) $className;
         foreach ($this->methodAnnotations as $methodAnnotation) {
-            if (TypeDescriptor::createFromVariable($methodAnnotation)->isCompatibleWith($className)) {
+            if ($methodAnnotation instanceof $className) {
                 return true;
             }
         }
@@ -117,16 +118,16 @@ class InterfaceToCall
     }
 
     /**
-     * @param Type $className
-     *
+     * @param class-string|Type $className
      * @return bool
      * @throws TypeDefinitionException
      * @throws MessagingException
      */
-    public function hasClassAnnotation(Type $className): bool
+    public function hasClassAnnotation(string|Type $className): bool
     {
+        $className = (string) $className;
         foreach ($this->getClassAnnotations() as $classAnnotation) {
-            if (TypeDescriptor::createFromVariable($classAnnotation)->isCompatibleWith($className)) {
+            if ($classAnnotation instanceof $className) {
                 return true;
             }
         }
@@ -134,24 +135,28 @@ class InterfaceToCall
         return false;
     }
 
-    public function hasAnnotation(Type $className): bool
+    /**
+     * @param class-string|Type $className
+     */
+    public function hasAnnotation(string|Type $className): bool
     {
         return $this->hasMethodAnnotation($className) || $this->hasClassAnnotation($className);
     }
 
     /**
+     * @param class-string $className
      * @return object[]
      */
-    public function getAnnotationsByImportanceOrder(Type $className): array
+    public function getAnnotationsByImportanceOrder(string $className): array
     {
         $annotations = [];
         foreach ($this->methodAnnotations as $methodAnnotation) {
-            if (TypeDescriptor::createFromVariable($methodAnnotation)->isCompatibleWith($className)) {
+            if ($methodAnnotation instanceof $className) {
                 $annotations[] = $methodAnnotation;
             }
         }
         foreach ($this->getClassAnnotations() as $classAnnotation) {
-            if (TypeDescriptor::createFromVariable($classAnnotation)->isCompatibleWith($className)) {
+            if ($classAnnotation instanceof $className) {
                 $annotations[] = $classAnnotation;
             }
         }
@@ -159,10 +164,14 @@ class InterfaceToCall
         return $annotations;
     }
 
-    public function getSingleClassAnnotationOf(Type $className): object
+    /**
+     * @param class-string|Type $className
+     */
+    public function getSingleClassAnnotationOf(string|Type $className): object
     {
+        $className = (string) $className;
         foreach ($this->getClassAnnotations() as $classAnnotation) {
-            if (TypeDescriptor::createFromVariable($classAnnotation)->isCompatibleWith($className)) {
+            if ($classAnnotation instanceof $className) {
                 return $classAnnotation;
             }
         }
@@ -171,13 +180,15 @@ class InterfaceToCall
     }
 
     /**
+     * @param class-string|Type $className
      * @return object[]
      */
-    public function getClassAnnotationOf(Type $className): array
+    public function getClassAnnotationOf(string|Type $className): array
     {
+        $className = (string) $className;
         $annotations = [];
         foreach ($this->getClassAnnotations() as $classAnnotation) {
-            if (TypeDescriptor::createFromVariable($classAnnotation)->isCompatibleWith($className)) {
+            if ($classAnnotation instanceof $className) {
                 $annotations[] = $classAnnotation;
             }
         }
@@ -186,14 +197,15 @@ class InterfaceToCall
     }
 
     /**
-     * @param Type $className
+     * @param class-string|Type $className
      *
      * @throws MessagingException
      */
-    public function getSingleMethodAnnotationOf(Type $className): object
+    public function getSingleMethodAnnotationOf(string|Type $className): object
     {
+        $className = (string) $className;
         foreach ($this->methodAnnotations as $methodAnnotation) {
-            if (TypeDescriptor::createFromVariable($methodAnnotation)->isCompatibleWith($className)) {
+            if ($methodAnnotation instanceof $className) {
                 return $methodAnnotation;
             }
         }
@@ -202,13 +214,15 @@ class InterfaceToCall
     }
 
     /**
+     * @param class-string|Type $className
      * @return object[]
      */
-    public function getMethodAnnotationsOf(Type $className): array
+    public function getMethodAnnotationsOf(string|Type $className): array
     {
+        $className = (string) $className;
         $methodAnnotations = [];
         foreach ($this->methodAnnotations as $methodAnnotation) {
-            if (TypeDescriptor::createFromVariable($methodAnnotation)->isCompatibleWith($className)) {
+            if ($methodAnnotation instanceof $className) {
                 $methodAnnotations[] = $methodAnnotation;
             }
         }
