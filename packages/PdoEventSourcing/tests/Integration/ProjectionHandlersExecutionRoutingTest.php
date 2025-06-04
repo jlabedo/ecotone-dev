@@ -13,6 +13,7 @@ use Enqueue\Dbal\DbalConnectionFactory;
 use Test\Ecotone\EventSourcing\EventSourcingMessagingTestCase;
 use Test\Ecotone\EventSourcing\Fixture\ProjectionHandlersExecutionRoutingTest\{AnAggregate,
     AnEvent,
+    Converters,
     ProjectionWithMulitpleHandlersForSameEvent,
     ProjectionWithObjectRouting,
     ProjectionWithRegexRouting};
@@ -22,10 +23,10 @@ class ProjectionHandlersExecutionRoutingTest extends EventSourcingMessagingTestC
     public function test_projection_with_object_routing(): void
     {
         $ecotone = EcotoneLite::bootstrapFlowTestingWithEventStore(
-            classesToResolve: [ProjectionWithObjectRouting::class, AnEvent::class, AnAggregate::class],
-            containerOrAvailableServices: [$projection = new ProjectionWithObjectRouting(), DbalConnectionFactory::class => $this->getConnectionFactory()],
+            classesToResolve: [ProjectionWithObjectRouting::class, AnEvent::class, AnAggregate::class, Converters::class],
+            containerOrAvailableServices: [$projection = new ProjectionWithObjectRouting(), new Converters(), DbalConnectionFactory::class => $this->getConnectionFactory()],
             configuration: ServiceConfiguration::createWithDefaults()
-                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE])),
             runForProductionEventStore: true
         );
 
@@ -41,10 +42,10 @@ class ProjectionHandlersExecutionRoutingTest extends EventSourcingMessagingTestC
     public function test_projection_with_regex_routing(): void
     {
         $ecotone = EcotoneLite::bootstrapFlowTestingWithEventStore(
-            classesToResolve: [ProjectionWithRegexRouting::class, AnEvent::class, AnAggregate::class],
-            containerOrAvailableServices: [$projection = new ProjectionWithRegexRouting(), DbalConnectionFactory::class => $this->getConnectionFactory()],
+            classesToResolve: [ProjectionWithRegexRouting::class, AnEvent::class, AnAggregate::class, Converters::class],
+            containerOrAvailableServices: [$projection = new ProjectionWithRegexRouting(), new Converters(), DbalConnectionFactory::class => $this->getConnectionFactory()],
             configuration: ServiceConfiguration::createWithDefaults()
-                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE])),
             runForProductionEventStore: true
         );
 
@@ -62,10 +63,10 @@ class ProjectionHandlersExecutionRoutingTest extends EventSourcingMessagingTestC
     public function test_projection_with_multiple_handlers_for_same_event(): void
     {
         $ecotone = EcotoneLite::bootstrapFlowTestingWithEventStore(
-            classesToResolve: [ProjectionWithMulitpleHandlersForSameEvent::class, AnEvent::class, AnAggregate::class],
-            containerOrAvailableServices: [$projection = new ProjectionWithMulitpleHandlersForSameEvent(), DbalConnectionFactory::class => $this->getConnectionFactory()],
+            classesToResolve: [ProjectionWithMulitpleHandlersForSameEvent::class, AnEvent::class, AnAggregate::class, Converters::class],
+            containerOrAvailableServices: [$projection = new ProjectionWithMulitpleHandlersForSameEvent(), new Converters(), DbalConnectionFactory::class => $this->getConnectionFactory()],
             configuration: ServiceConfiguration::createWithDefaults()
-                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE, ModulePackageList::JMS_CONVERTER_PACKAGE])),
+                ->withSkippedModulePackageNames(ModulePackageList::allPackagesExcept([ModulePackageList::DBAL_PACKAGE, ModulePackageList::EVENT_SOURCING_PACKAGE, ModulePackageList::ASYNCHRONOUS_PACKAGE])),
             runForProductionEventStore: true
         );
 
