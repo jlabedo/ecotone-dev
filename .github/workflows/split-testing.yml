@@ -24,6 +24,8 @@ jobs:
           - php-version: '8.4'
           - php-version: '8.1'
             stability: prefer-lowest
+          - php-version: '8.4'
+            stability: prefer-lowest
 
     services:
       kafka:
