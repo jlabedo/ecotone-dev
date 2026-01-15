@@ -24,6 +24,8 @@ jobs:
           - php-version: '8.4'
           - php-version: '8.2'
             stability: prefer-lowest
+          - php-version: '8.4'
+            stability: prefer-lowest
 
     services:
       kafka:
@@ -136,9 +138,9 @@ jobs:
           RUN_TESTS="composer tests:ci"
 
           if [ "${{ matrix.stability }}" = "prefer-lowest" ]; then
-            COMPOSER_UP="composer update --${{ matrix.stability }}"
+            COMPOSER_UP="composer update --${{ matrix.stability }} -W"
           else
-            COMPOSER_UP="composer update"
+            COMPOSER_UP="composer update -W"
           fi
 
           _run_tests() {
