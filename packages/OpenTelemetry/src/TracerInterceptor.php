@@ -224,9 +224,7 @@ final class TracerInterceptor
                 $routingSlip = $message->getHeaders()->resolveRoutingSlip();
                 if (!empty($routingSlip)) {
                     $destination = $routingSlip[0];
-                    if (str_ends_with($destination, '.target-connection.execute')) {
-                        $destination = substr($destination, 0, -strlen('.target-connection.execute'));
-                    }
+                    $destination = $this->normalizeEndpointId($destination);
                     return $destination;
                 }
             } catch (\Ecotone\Messaging\MessagingException $e) {
@@ -242,5 +240,26 @@ final class TracerInterceptor
         }
         
         return 'unknown';
+    }
+
+    private function normalizeEndpointId(string $destination): string
+    {
+        $suffixes = [
+            '.target-connection.execute',
+            '.target-connection',
+            '.target.execute',
+            '-connection.execute',
+            '.target',
+            '-connection',
+            '.execute',
+        ];
+
+        foreach ($suffixes as $suffix) {
+            if (str_ends_with($destination, $suffix)) {
+                return substr($destination, 0, -strlen($suffix));
+            }
+        }
+
+        return $destination;
     }
 }
