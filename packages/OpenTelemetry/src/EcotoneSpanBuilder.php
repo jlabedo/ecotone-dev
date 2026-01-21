@@ -6,6 +6,7 @@ namespace Ecotone\OpenTelemetry;
 
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHeaders;
+use Ecotone\OpenTelemetry\Support\MessagingAttributes;
 
 use function is_scalar;
 
@@ -34,10 +35,50 @@ final class EcotoneSpanBuilder
             }
         }
 
+        $spanBuilder = $tracerProvider
+            ->getTracer(self::ECOTONE_TRACER_NAME)
+            ->spanBuilder($traceName)
+            ->setSpanKind($type)
+            ->setAttribute(MessageHeaders::MESSAGE_ID, $context->getHeaders()->getMessageId())
+            ->setAttribute(MessageHeaders::MESSAGE_CORRELATION_ID, $context->getHeaders()->getCorrelationId())
+            ->setAttribute(MessageHeaders::PARENT_MESSAGE_ID, $context->getHeaders()->getParentId())
+            ->setAttribute(MessageHeaders::TIMESTAMP, $context->getHeaders()->getTimestamp())
+            ->setAttributes($userHeaders);
+
+        return $spanBuilder;
+    }
+
+    public static function createWithMessagingAttributes(
+        Message                 $context,
+        string                  $traceName,
+        TracerProviderInterface $tracerProvider,
+        string                  $system,
+        string                  $destinationName,
+        string                  $operation,
+        int                     $type = SpanKind::KIND_SERVER,
+        ?int                    $batchMessageCount = null
+    ): SpanBuilderInterface {
+        $messagingAttributes = MessagingAttributes::build(
+            $system,
+            $destinationName,
+            $operation,
+            $context->getHeaders()->getMessageId(),
+            $batchMessageCount
+        );
+
+        $userHeaders = MessageHeaders::unsetAllFrameworkHeaders($context->getHeaders()->headers());
+
+        foreach ($userHeaders as $key => $value) {
+            if (! is_scalar($value)) {
+                unset($userHeaders[$key]);
+            }
+        }
+
         return $tracerProvider
             ->getTracer(self::ECOTONE_TRACER_NAME)
             ->spanBuilder($traceName)
             ->setSpanKind($type)
+            ->setAttributes($messagingAttributes)
             ->setAttribute(MessageHeaders::MESSAGE_ID, $context->getHeaders()->getMessageId())
             ->setAttribute(MessageHeaders::MESSAGE_CORRELATION_ID, $context->getHeaders()->getCorrelationId())
             ->setAttribute(MessageHeaders::PARENT_MESSAGE_ID, $context->getHeaders()->getParentId())

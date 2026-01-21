@@ -9,12 +9,15 @@ use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageChannel;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Support\MessageBuilder;
+use Ecotone\OpenTelemetry\Support\MessagingAttributes;
 
 use function json_decode;
 use function json_encode;
 
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
+use OpenTelemetry\API\Trace\Span as APISpan;
 use OpenTelemetry\API\Trace\SpanKind;
+use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\Context\Context;
@@ -27,6 +30,7 @@ use Throwable;
 final class TracingChannelInterceptor implements ChannelInterceptor
 {
     public const TRACING_CARRIER_HEADER = 'ecotoneTracingCarrier';
+    private const MESSAGING_SYSTEM = MessagingAttributes::SYSTEM_ECOTONE;
 
     public function __construct(private string $channelName, private TracerProviderInterface $tracerProvider)
     {
@@ -34,8 +38,17 @@ final class TracingChannelInterceptor implements ChannelInterceptor
 
     public function preSend(Message $message, MessageChannel $messageChannel): ?Message
     {
-        $span = EcotoneSpanBuilder::create($message, 'Sending to Channel: ' . $this->channelName, $this->tracerProvider, SpanKind::KIND_PRODUCER)
-            ->startSpan();
+        $spanName = MessagingAttributes::buildSpanName(MessagingAttributes::OPERATION_SEND, $this->channelName);
+        
+        $span = EcotoneSpanBuilder::createWithMessagingAttributes(
+            $message,
+            $spanName,
+            $this->tracerProvider,
+            self::MESSAGING_SYSTEM,
+            $this->channelName,
+            MessagingAttributes::OPERATION_SEND,
+            SpanKind::KIND_PRODUCER
+        )->startSpan();
 
         $scope = $span->activate();
         $ctx = $span->storeInContext(Context::getCurrent());
@@ -71,13 +84,33 @@ final class TracingChannelInterceptor implements ChannelInterceptor
     public function afterReceiveCompletion(?Message $message, MessageChannel $messageChannel, ?Throwable $exception): void
     {
         if ($exception !== null && $message !== null) {
-            // @TODO test
             $carrier = $message->getHeaders()->containsKey(self::TRACING_CARRIER_HEADER) ? json_decode($message->getHeaders()->get(self::TRACING_CARRIER_HEADER), true) : [];
             $context = TraceContextPropagator::getInstance()->extract($carrier);
 
-            $span = EcotoneSpanBuilder::create($message, 'Asynchronous Channel: ' . $this->channelName, $this->tracerProvider, SpanKind::KIND_CONSUMER)
-                ->setParent($context)
-                ->startSpan();
+            $spanName = MessagingAttributes::buildSpanName(MessagingAttributes::OPERATION_RECEIVE, $this->channelName);
+            
+            $producerSpan = APISpan::fromContext($context);
+            $producerSpanContext = $producerSpan->getContext();
+            
+            $spanBuilder = EcotoneSpanBuilder::createWithMessagingAttributes(
+                $message,
+                $spanName,
+                $this->tracerProvider,
+                self::MESSAGING_SYSTEM,
+                $this->channelName,
+                MessagingAttributes::OPERATION_RECEIVE,
+                SpanKind::KIND_CONSUMER
+            )
+                ->setParent($context);
+            
+            if ($producerSpanContext->isValid()) {
+                $spanBuilder = $spanBuilder->addLink(
+                    $producerSpanContext,
+                    [MessagingAttributes::MESSAGING_MESSAGE_ID => $message->getHeaders()->getMessageId()]
+                );
+            }
+            
+            $span = $spanBuilder->startSpan();
 
             $span->setStatus(StatusCode::STATUS_ERROR);
             $span->end();

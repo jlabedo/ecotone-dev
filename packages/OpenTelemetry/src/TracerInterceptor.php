@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Ecotone\OpenTelemetry;
 
+use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Support\MessageBuilder;
+use Ecotone\OpenTelemetry\Support\MessagingAttributes;
 
 use function json_decode;
 
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
+use OpenTelemetry\API\Trace\Span as APISpan;
 use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
@@ -32,30 +35,59 @@ final class TracerInterceptor
 
     public function traceAsynchronousEndpoint(MethodInvocation $methodInvocation, Message $message)
     {
-        /**
-         * @TODO tag polledChannelName, routingSlip
-         */
         $carrier = $message->getHeaders()->containsKey(TracingChannelInterceptor::TRACING_CARRIER_HEADER) ? json_decode($message->getHeaders()->get(TracingChannelInterceptor::TRACING_CARRIER_HEADER), true) : [];
         $parentContext = TraceContextPropagator::getInstance()->extract($carrier);
 
         $scope = $parentContext->activate();
         try {
-            $trace = $this->trace(
-                $message->getHeaders()->containsKey(MessageHeaders::POLLED_CHANNEL_NAME)
-                    ? 'Receiving from channel: ' . $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME)
-                    : 'Endpoint: ' . $message->getHeaders()->get(MessageHeaders::CONSUMER_POLLING_METADATA)->getEndpointId() . ' produced Message',
-                $methodInvocation,
+            $destinationName = $this->getDestinationName($methodInvocation, $message);
+
+            $spanName = MessagingAttributes::buildSpanName(MessagingAttributes::OPERATION_PROCESS, $destinationName);
+
+            $producerSpan = APISpan::fromContext($parentContext);
+            $producerSpanContext = $producerSpan->getContext();
+            
+            $spanBuilder = EcotoneSpanBuilder::createWithMessagingAttributes(
                 $message,
-                spanKind: SpanKind::KIND_CONSUMER,
-            );
+                $spanName,
+                $this->tracerProvider,
+                MessagingAttributes::SYSTEM_ECOTONE,
+                $destinationName,
+                MessagingAttributes::OPERATION_PROCESS,
+                SpanKind::KIND_CONSUMER
+            )
+                ->setParent($parentContext);
+            
+            if ($producerSpanContext->isValid()) {
+                $spanBuilder = $spanBuilder->addLink(
+                    $producerSpanContext,
+                    [MessagingAttributes::MESSAGING_MESSAGE_ID => $message->getHeaders()->getMessageId()]
+                );
+            }
+            
+            $span = $spanBuilder->startSpan();
+
+            $spanScope = $span->activate();
+
+            try {
+                $result = $methodInvocation->proceed();
+            } catch (Throwable $exception) {
+                $span->recordException($exception);
+                $this->closeSpan($span, $spanScope, StatusCode::STATUS_ERROR, $exception->getMessage());
+                $scope->detach();
+
+                throw $exception;
+            }
+
+            $this->closeSpan($span, $spanScope, StatusCode::STATUS_OK, null);
+            $scope->detach();
+
+            return $result;
         } catch (Throwable $exception) {
             $scope->detach();
 
             throw $exception;
         }
-        $scope->detach();
-
-        return $trace;
     }
 
     public function provideContextForDistributedBus(Message $message): Message
@@ -183,5 +215,32 @@ final class TracerInterceptor
         $span->setStatus($statusCode, $descriptionStatusCode);
         $spanScope->detach();
         $span->end();
+    }
+
+    private function getDestinationName(MethodInvocation $methodInvocation, Message $message): string
+    {
+        if ($message->getHeaders()->containsKey(MessageHeaders::ROUTING_SLIP)) {
+            try {
+                $routingSlip = $message->getHeaders()->resolveRoutingSlip();
+                if (!empty($routingSlip)) {
+                    $destination = $routingSlip[0];
+                    if (str_ends_with($destination, '.target-connection.execute')) {
+                        $destination = substr($destination, 0, -strlen('.target-connection.execute'));
+                    }
+                    return $destination;
+                }
+            } catch (\Ecotone\Messaging\MessagingException $e) {
+            }
+        }
+        
+        if ($message->getHeaders()->containsKey(MessageHeaders::CONSUMER_POLLING_METADATA)) {
+            return $message->getHeaders()->get(MessageHeaders::CONSUMER_POLLING_METADATA)->getEndpointId();
+        }
+        
+        if ($message->getHeaders()->containsKey(MessageHeaders::POLLED_CHANNEL_NAME)) {
+            return $message->getHeaders()->get(MessageHeaders::POLLED_CHANNEL_NAME);
+        }
+        
+        return 'unknown';
     }
 }

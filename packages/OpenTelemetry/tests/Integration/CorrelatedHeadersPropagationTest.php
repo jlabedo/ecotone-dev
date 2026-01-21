@@ -157,9 +157,9 @@ final class CorrelatedHeadersPropagationTest extends TracingTestCase
             [
                 'details' => ['name' => 'Command Bus'],
                 'child' => [
-                    'details' => ['name' => 'Sending to Channel: async_channel'],
+                    'details' => ['name' => 'send async_channel'],
                     'child' => [
-                        'details' => ['name' => 'Receiving from channel: async_channel'],
+                        'details' => ['name' => 'process user.register'],
                     ],
                 ],
             ],

@@ -119,11 +119,11 @@ final class TracingTreeTest extends TracingTestCase
         self::compareTreesByDetails(
             [
                 [
-                    'details' => ['name' => 'Endpoint: scheduled_handler produced Message'],
+                    'details' => ['name' => 'process scheduled_handler'],
                     'children' => [],
                 ],
                 [
-                    'details' => ['name' => 'Endpoint: scheduled_handler produced Message'],
+                    'details' => ['name' => 'process scheduled_handler'],
                     'children' => [],
                 ],
             ],
@@ -146,7 +146,7 @@ final class TracingTreeTest extends TracingTestCase
         self::compareTreesByDetails(
             [
                 [
-                    'details' => ['name' => 'Endpoint: scheduled_handler produced Message'],
+                    'details' => ['name' => 'process scheduled_handler'],
                     'children' => [
                         [
                             'details' => ['name' => 'Message Handler: ' . WorkflowScheduledHandler::class . '::add'],
@@ -155,7 +155,7 @@ final class TracingTreeTest extends TracingTestCase
                     ],
                 ],
                 [
-                    'details' => ['name' => 'Endpoint: scheduled_handler produced Message'],
+                    'details' => ['name' => 'process scheduled_handler'],
                     'children' => [
                         [
                             'details' => ['name' => 'Message Handler: ' . WorkflowScheduledHandler::class . '::add'],
@@ -507,10 +507,10 @@ final class TracingTreeTest extends TracingTestCase
                     'details' => ['name' => 'Command Bus'],
                     'children' => [
                         [
-                            'details' => ['name' => 'Sending to Channel: async_channel'],
+                            'details' => ['name' => 'send async_channel'],
                             'children' => [
                                 [
-                                    'details' => ['name' => 'Receiving from channel: async_channel'],
+                                    'details' => ['name' => 'process user.register'],
                                     'children' => [
                                         [
                                             'details' => ['name' => 'Command Handler: ' . \Test\Ecotone\OpenTelemetry\Fixture\AsynchronousFlow\User::class . '::register'],
@@ -553,9 +553,9 @@ final class TracingTreeTest extends TracingTestCase
             [
                 'details' => ['name' => 'Command Bus'],
                 'child' => [
-                    'details' => ['name' => 'Sending to Channel: async_channel'],
+                    'details' => ['name' => 'send async_channel'],
                     'child' => [
-                        'details' => ['name' => 'Receiving from channel: async_channel'],
+                        'details' => ['name' => 'process user.register'],
                         'child' => [
                             'details' => ['name' => 'Event Bus'],
                         ],
@@ -603,10 +603,10 @@ final class TracingTreeTest extends TracingTestCase
                     'details' => ['name' => 'Command Bus', 'attributes' => ['flowId' => '1']],
                     'children' => [
                         [
-                            'details' => ['name' => 'Sending to Channel: async_channel', 'attributes' => ['flowId' => '1']],
+                            'details' => ['name' => 'send async_channel', 'attributes' => ['flowId' => '1']],
                             'children' => [
                                 [
-                                    'details' => ['name' => 'Receiving from channel: async_channel', 'attributes' => ['flowId' => '1']],
+                                    'details' => ['name' => 'process user.register', 'attributes' => ['flowId' => '1']],
                                     'children' => [
                                         [
                                             'details' => ['name' => 'Command Handler: ' . \Test\Ecotone\OpenTelemetry\Fixture\AsynchronousFlow\User::class . '::register', 'attributes' => ['flowId' => '1']],
@@ -622,10 +622,10 @@ final class TracingTreeTest extends TracingTestCase
                     'details' => ['name' => 'Command Bus', 'attributes' => ['flowId' => '2']],
                     'children' => [
                         [
-                            'details' => ['name' => 'Sending to Channel: async_channel', 'attributes' => ['flowId' => '2']],
+                            'details' => ['name' => 'send async_channel', 'attributes' => ['flowId' => '2']],
                             'children' => [
                                 [
-                                    'details' => ['name' => 'Receiving from channel: async_channel', 'attributes' => ['flowId' => '2']],
+                                    'details' => ['name' => 'process user.register', 'attributes' => ['flowId' => '2']],
                                     'children' => [
                                         [
                                             'details' => ['name' => 'Command Handler: ' . \Test\Ecotone\OpenTelemetry\Fixture\AsynchronousFlow\User::class . '::register', 'attributes' => ['flowId' => '2']],
@@ -674,13 +674,13 @@ final class TracingTreeTest extends TracingTestCase
                     'children' => [
                         [
                             'details' => [
-                                'name' => 'Sending to Channel: async_channel',
+                                'name' => 'send async_channel',
                                 'attributes' => ['user_id' => '123'],
                             ],
                             'children' => [
                                 [
                                     'details' => [
-                                        'name' => 'Receiving from channel: async_channel',
+                                        'name' => 'process user.register',
                                         'attributes' => ['user_id' => '123'],
                                     ],
                                     'children' => [
