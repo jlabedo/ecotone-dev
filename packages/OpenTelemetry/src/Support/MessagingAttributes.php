@@ -87,4 +87,35 @@ final class MessagingAttributes
 
         return self::SYSTEM_ECOTONE;
     }
+
+    /**
+     * Detect messaging system from MessageChannel instance class name.
+     * Returns the appropriate system identifier based on the channel implementation.
+     */
+    public static function detectSystemFromChannel(object $channel): string
+    {
+        $className = get_class($channel);
+        
+        if (str_contains($className, 'Kafka\\') || str_contains($className, 'KafkaMessageChannel')) {
+            return self::SYSTEM_KAFKA;
+        }
+        
+        if (str_contains($className, 'Amqp\\') || str_contains($className, 'RabbitMq') || str_contains($className, 'RabbitMQ')) {
+            return self::SYSTEM_RABBITMQ;
+        }
+        
+        if (str_contains($className, 'Sqs\\') || str_contains($className, 'SqsMessageChannel') || str_contains($className, 'SqsInboundChannelAdapter') || str_contains($className, 'SqsOutboundChannelAdapter')) {
+            return self::SYSTEM_SQS;
+        }
+        
+        if (str_contains($className, 'Redis\\') || str_contains($className, 'RedisMessageChannel') || str_contains($className, 'RedisInboundChannelAdapter') || str_contains($className, 'RedisOutboundChannelAdapter')) {
+            return self::SYSTEM_REDIS;
+        }
+        
+        if (str_contains($className, 'Dbal\\') || str_contains($className, 'DbalMessageChannel') || str_contains($className, 'DbalBackedMessageChannel') || str_contains($className, 'DbalInboundChannelAdapter') || str_contains($className, 'DbalOutboundChannelAdapter')) {
+            return self::SYSTEM_DBAL;
+        }
+        
+        return self::SYSTEM_ECOTONE;
+    }
 }

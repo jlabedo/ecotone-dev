@@ -30,7 +30,6 @@ use Throwable;
 final class TracingChannelInterceptor implements ChannelInterceptor
 {
     public const TRACING_CARRIER_HEADER = 'ecotoneTracingCarrier';
-    private const MESSAGING_SYSTEM = MessagingAttributes::SYSTEM_ECOTONE;
 
     public function __construct(private string $channelName, private TracerProviderInterface $tracerProvider)
     {
@@ -39,12 +38,13 @@ final class TracingChannelInterceptor implements ChannelInterceptor
     public function preSend(Message $message, MessageChannel $messageChannel): ?Message
     {
         $spanName = MessagingAttributes::buildSpanName(MessagingAttributes::OPERATION_SEND, $this->channelName);
+        $messagingSystem = MessagingAttributes::detectSystemFromChannel($messageChannel);
         
         $span = EcotoneSpanBuilder::createWithMessagingAttributes(
             $message,
             $spanName,
             $this->tracerProvider,
-            self::MESSAGING_SYSTEM,
+            $messagingSystem,
             $this->channelName,
             MessagingAttributes::OPERATION_SEND,
             SpanKind::KIND_PRODUCER
@@ -88,6 +88,7 @@ final class TracingChannelInterceptor implements ChannelInterceptor
             $context = TraceContextPropagator::getInstance()->extract($carrier);
 
             $spanName = MessagingAttributes::buildSpanName(MessagingAttributes::OPERATION_RECEIVE, $this->channelName);
+            $messagingSystem = MessagingAttributes::detectSystemFromChannel($messageChannel);
             
             $producerSpan = APISpan::fromContext($context);
             $producerSpanContext = $producerSpan->getContext();
@@ -96,10 +97,10 @@ final class TracingChannelInterceptor implements ChannelInterceptor
                 $message,
                 $spanName,
                 $this->tracerProvider,
-                self::MESSAGING_SYSTEM,
+                $messagingSystem,
                 $this->channelName,
                 MessagingAttributes::OPERATION_RECEIVE,
-                SpanKind::KIND_CONSUMER
+                SpanKind::KIND_CLIENT
             )
                 ->setParent($context);
             
