@@ -1,9 +1,13 @@
 <?php
-
+/*
+ * licence Enterprise
+ */
 declare(strict_types=1);
 
-namespace Ecotone\OpenTelemetry\Support;
+namespace Ecotone\OpenTelemetry;
 
+use Ecotone\Messaging\Channel\MessageChannelInterceptorAdapter;
+use Ecotone\Messaging\MessageChannel;
 use OpenTelemetry\SemConv\Incubating\Attributes\MessagingIncubatingAttributes;
 
 /**
@@ -76,46 +80,22 @@ final class MessagingAttributes
     }
 
     /**
-     * Detect messaging system from channel name or configuration.
-     * Defaults to "ecotone" for in-memory channels.
-     */
-    public static function detectSystem(?string $configuredSystem = null): string
-    {
-        if ($configuredSystem !== null) {
-            return $configuredSystem;
-        }
-
-        return self::SYSTEM_ECOTONE;
-    }
-
-    /**
      * Detect messaging system from MessageChannel instance class name.
      * Returns the appropriate system identifier based on the channel implementation.
      */
-    public static function detectSystemFromChannel(object $channel): string
+    public static function detectSystemFromChannel(MessageChannel $channel): string
     {
+        if ($channel instanceof MessageChannelInterceptorAdapter) {
+            $channel = $channel->getInternalMessageChannel();
+        }
         $className = get_class($channel);
-        
-        if (str_contains($className, 'Kafka\\') || str_contains($className, 'KafkaMessageChannel')) {
-            return self::SYSTEM_KAFKA;
-        }
-        
-        if (str_contains($className, 'Amqp\\') || str_contains($className, 'RabbitMq') || str_contains($className, 'RabbitMQ')) {
-            return self::SYSTEM_RABBITMQ;
-        }
-        
-        if (str_contains($className, 'Sqs\\') || str_contains($className, 'SqsMessageChannel') || str_contains($className, 'SqsInboundChannelAdapter') || str_contains($className, 'SqsOutboundChannelAdapter')) {
-            return self::SYSTEM_SQS;
-        }
-        
-        if (str_contains($className, 'Redis\\') || str_contains($className, 'RedisMessageChannel') || str_contains($className, 'RedisInboundChannelAdapter') || str_contains($className, 'RedisOutboundChannelAdapter')) {
-            return self::SYSTEM_REDIS;
-        }
-        
-        if (str_contains($className, 'Dbal\\') || str_contains($className, 'DbalMessageChannel') || str_contains($className, 'DbalBackedMessageChannel') || str_contains($className, 'DbalInboundChannelAdapter') || str_contains($className, 'DbalOutboundChannelAdapter')) {
-            return self::SYSTEM_DBAL;
-        }
-        
-        return self::SYSTEM_ECOTONE;
+
+        return match (true) {
+            str_contains($className, 'Kafka\\') => self::SYSTEM_KAFKA,
+            str_contains($className, 'Amqp\\') => self::SYSTEM_SQS,
+            str_contains($className, 'Redis\\') => self::SYSTEM_REDIS,
+            str_contains($className, 'Dbal\\') => self::SYSTEM_DBAL,
+            default => self::SYSTEM_ECOTONE,
+        };
     }
 }

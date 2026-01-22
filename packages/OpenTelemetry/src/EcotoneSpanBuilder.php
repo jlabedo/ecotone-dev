@@ -6,13 +6,10 @@ namespace Ecotone\OpenTelemetry;
 
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHeaders;
-use Ecotone\OpenTelemetry\Support\MessagingAttributes;
-
-use function is_scalar;
-
 use OpenTelemetry\API\Trace\SpanBuilderInterface;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
+use function is_scalar;
 
 /**
  * licence Apache-2.0

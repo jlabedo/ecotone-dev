@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace Ecotone\OpenTelemetry;
 
-use Ecotone\Messaging\Attribute\AsynchronousRunningEndpoint;
 use Ecotone\Messaging\Handler\Processor\MethodInvoker\MethodInvocation;
 use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Support\MessageBuilder;
-use Ecotone\OpenTelemetry\Support\MessagingAttributes;
-
-use function json_decode;
-
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
 use OpenTelemetry\API\Trace\Span as APISpan;
 use OpenTelemetry\API\Trace\SpanInterface;
@@ -23,6 +18,7 @@ use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ScopeInterface;
 use OpenTelemetry\SDK\Trace\Span;
 use Throwable;
+use function json_decode;
 
 /**
  * licence Apache-2.0

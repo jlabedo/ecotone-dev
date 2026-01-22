@@ -9,20 +9,16 @@ use Ecotone\Messaging\Message;
 use Ecotone\Messaging\MessageChannel;
 use Ecotone\Messaging\MessageHeaders;
 use Ecotone\Messaging\Support\MessageBuilder;
-use Ecotone\OpenTelemetry\Support\MessagingAttributes;
-
-use function json_decode;
-use function json_encode;
-
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
 use OpenTelemetry\API\Trace\Span as APISpan;
 use OpenTelemetry\API\Trace\SpanKind;
-use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\SDK\Trace\Span;
 use Throwable;
+use function json_decode;
+use function json_encode;
 
 /**
  * licence Apache-2.0
