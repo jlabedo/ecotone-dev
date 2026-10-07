@@ -12,12 +12,14 @@ use Ecotone\EventSourcing\Attribute\FromStream;
 use Ecotone\EventSourcing\Attribute\ProjectionDelete;
 use Ecotone\EventSourcing\Attribute\ProjectionReset;
 use Ecotone\EventSourcing\EventStore;
+use Ecotone\EventSourcing\PdoStreamTableNameProvider;
 use Ecotone\EventSourcing\Projecting\StreamSource\EventStoreGlobalStreamSource;
 use Ecotone\Lite\EcotoneLite;
 use Ecotone\Lite\Test\FlowTestSupport;
 use Ecotone\Messaging\Config\ModulePackageList;
 use Ecotone\Messaging\Config\ServiceConfiguration;
 use Ecotone\Messaging\Endpoint\ExecutionPollingMetadata;
+use Ecotone\Messaging\Scheduling\StubUTCClock;
 use Ecotone\Modelling\Attribute\EventHandler;
 use Ecotone\Modelling\Attribute\QueryHandler;
 use Ecotone\Modelling\Event;
@@ -25,6 +27,7 @@ use Ecotone\Projecting\Attribute\Partitioned;
 use Ecotone\Projecting\Attribute\Polling;
 use Ecotone\Projecting\Attribute\ProjectionExecution;
 use Ecotone\Projecting\Attribute\ProjectionV2;
+use Ecotone\Projecting\StreamFilterRegistry;
 use Ecotone\Test\LicenceTesting;
 use RuntimeException;
 use Test\Ecotone\EventSourcing\Fixture\Calendar\CalendarCreated;
@@ -152,6 +155,30 @@ final class MultiStreamProjectionTest extends ProjectingTestCase
         $page = $source->load($projection::NAME, $page->lastPosition, 1);
         self::assertSame([20], array_map(fn ($event) => $event->getPayload()['sequence'], $page->events));
         self::assertSame('ordered_stream_a=3:;ordered_stream_b=2:;', $page->lastPosition);
+    }
+
+    public function test_preserving_unconsumed_filled_gaps_outside_max_gap_offset(): void
+    {
+        $projection = $this->createOrderingProjection();
+        $ecotone = $this->bootstrapEcotone([$projection::class], [$projection]);
+        $source = new EventStoreGlobalStreamSource(
+            self::getConnectionFactory(),
+            new StubUTCClock(),
+            $ecotone->getServiceFromContainer(PdoStreamTableNameProvider::class),
+            $ecotone->getServiceFromContainer(StreamFilterRegistry::class),
+            [$projection::NAME],
+            maxGapOffset: 3
+        );
+
+        $this->appendOrderingEvents($ecotone, 'ordered_stream_a', [20, 21, 22, 23, 24]);
+        $this->appendOrderingEvents($ecotone, 'ordered_stream_b', [1]);
+
+        $page = $source->load($projection::NAME, 'ordered_stream_a=5:1;ordered_stream_b=0:;', 1);
+        self::assertSame([1], array_map(fn ($event) => $event->getPayload()['sequence'], $page->events));
+
+        $page = $source->load($projection::NAME, $page->lastPosition, 1);
+        self::assertSame([20], array_map(fn ($event) => $event->getPayload()['sequence'], $page->events));
+        self::assertSame([], $source->load($projection::NAME, $page->lastPosition, 1)->events);
     }
 
     public function test_building_multi_stream_synchronous_projection(): void
