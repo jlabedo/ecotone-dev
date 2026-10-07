@@ -164,9 +164,19 @@ class EventStoreGlobalStreamSource implements StreamSource
         $newPositions = [];
         $connection = $this->getConnection();
         foreach ($tracking as $streamName => $streamTracking) {
+            $unconsumedGaps = [];
+            foreach (array_slice($streamEvents[$streamName], $offsets[$streamName]) as $event) {
+                if ($event->no <= $streamTracking->getPosition()) {
+                    $unconsumedGaps[] = $event->no;
+                }
+            }
+
             $streamTracking->cleanByMaxOffset($this->maxGapOffset);
             $this->cleanGapsByTimeout($streamTracking, $connection, $this->tableNameProvider->generateTableNameForStream($streamName));
-            $newPositions[$streamName] = (string) $streamTracking;
+            $newPositions[$streamName] = (string) new GapAwarePosition(
+                $streamTracking->getPosition(),
+                [...$streamTracking->getGaps(), ...$unconsumedGaps]
+            );
         }
 
         return new StreamPage($events, $this->encodeMultiStreamPositions($newPositions));
